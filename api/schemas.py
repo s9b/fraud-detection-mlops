@@ -484,6 +484,8 @@ class PredictRequest(BaseModel):
 class PredictResponse(BaseModel):
     """Prediction response."""
 
+    model_config = {"protected_namespaces": ()}
+
     fraud_probability: float = Field(..., ge=0.0, le=1.0, description="Probability of fraud [0,1]")
     is_fraud: bool = Field(..., description="Binary fraud decision at configured threshold")
     threshold: float = Field(..., description="Decision threshold used")
@@ -492,6 +494,8 @@ class PredictResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     """Health check response."""
+
+    model_config = {"protected_namespaces": ()}
 
     status: str
     model_loaded: bool

@@ -112,12 +112,16 @@ def _build_feature_row(request: PredictRequest, params: dict) -> pd.DataFrame:
 
     df = pd.DataFrame([row])
 
-    # Fill NaN for any missing numeric fields
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    df[numeric_cols] = df[numeric_cols].fillna(0)
+    # Coerce every column to float64 — None values become NaN, then fill with 0.
+    # This is necessary because a single-row DataFrame built from a dict of
+    # mostly-None values leaves those columns as object dtype.
+    df = df.apply(pd.to_numeric, errors="coerce").fillna(0)
 
     # Apply feature engineering
     df = run_feature_engineering(df, params)
+
+    # Final dtype enforcement: ensure no object columns remain before XGBoost
+    df = df.astype(float)
 
     return df
 

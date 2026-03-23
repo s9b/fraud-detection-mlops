@@ -9,6 +9,9 @@ import logging
 import sys
 from pathlib import Path
 
+# Allow running as `python src/evaluate.py` from the project root
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import mlflow
 import mlflow.xgboost
 import numpy as np
