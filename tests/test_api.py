@@ -12,6 +12,7 @@ import numpy as np
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture(scope="module")
 def client():
     """
@@ -25,6 +26,7 @@ def client():
     with patch("api.main._load_model", return_value=(mock_model, "test-v1")):
         with patch("api.main._load_params", return_value=_mock_params()):
             from api.main import app
+
             with TestClient(app) as c:
                 yield c
 
@@ -69,6 +71,7 @@ def _full_predict_payload() -> dict:
 
 # ── Health endpoint ───────────────────────────────────────────────────────────
 
+
 def test_health_returns_200(client):
     response = client.get("/health")
     assert response.status_code == 200
@@ -95,12 +98,14 @@ def test_health_model_loaded_true(client):
 
 # ── Root endpoint ─────────────────────────────────────────────────────────────
 
+
 def test_root_returns_200(client):
     response = client.get("/")
     assert response.status_code == 200
 
 
 # ── Predict endpoint — valid requests ─────────────────────────────────────────
+
 
 def test_predict_returns_200_with_valid_payload(client):
     response = client.post("/predict", json=_full_predict_payload())
@@ -149,6 +154,7 @@ def test_predict_all_null_features_accepted(client):
 
 # ── Predict endpoint — invalid requests ───────────────────────────────────────
 
+
 def test_predict_rejects_negative_transaction_amount(client):
     payload = {
         "transaction": {
@@ -182,11 +188,11 @@ def test_predict_missing_transaction_key_returns_422(client):
 
 # ── Model unavailable ─────────────────────────────────────────────────────────
 
+
 def test_predict_returns_503_when_model_not_loaded():
     """When model loading fails, /predict should return 503."""
     with patch("api.main._load_model", side_effect=RuntimeError("no model")):
         with patch("api.main._load_params", return_value=_mock_params()):
-            from importlib import reload
             import api.main as main_module
 
             # Directly set global to None to simulate failed load

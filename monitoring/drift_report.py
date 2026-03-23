@@ -18,7 +18,11 @@ import numpy as np
 import pandas as pd
 import yaml
 from evidently import ColumnMapping
-from evidently.metric_preset import DataDriftPreset, DataQualityPreset, TargetDriftPreset
+from evidently.metric_preset import (
+    DataDriftPreset,
+    DataQualityPreset,
+    TargetDriftPreset,
+)
 from evidently.report import Report
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -54,19 +58,57 @@ def load_current(current_path: str) -> pd.DataFrame:
 
 _PRIORITY_COLS = [
     # Key transaction features
-    "TransactionAmt", "TransactionDT", "ProductCD",
-    "card1", "card2", "card3", "card4", "card5", "card6",
-    "addr1", "addr2", "dist1", "dist2",
-    "P_emaildomain", "R_emaildomain",
+    "TransactionAmt",
+    "TransactionDT",
+    "ProductCD",
+    "card1",
+    "card2",
+    "card3",
+    "card4",
+    "card5",
+    "card6",
+    "addr1",
+    "addr2",
+    "dist1",
+    "dist2",
+    "P_emaildomain",
+    "R_emaildomain",
     # Count / timedelta features
-    "C1", "C2", "C3", "C4", "C5", "C6", "C13", "C14",
-    "D1", "D2", "D3", "D4", "D10", "D15",
+    "C1",
+    "C2",
+    "C3",
+    "C4",
+    "C5",
+    "C6",
+    "C13",
+    "C14",
+    "D1",
+    "D2",
+    "D3",
+    "D4",
+    "D10",
+    "D15",
     # Top Vesta features by typical importance
-    "V258", "V257", "V201", "V169", "V87", "V82", "V83", "V53", "V54",
-    "V75", "V76", "V61", "V62",
+    "V258",
+    "V257",
+    "V201",
+    "V169",
+    "V87",
+    "V82",
+    "V83",
+    "V53",
+    "V54",
+    "V75",
+    "V76",
+    "V61",
+    "V62",
     # Engineered
-    "tx_amt_log", "tx_hour", "tx_dayofweek", "tx_is_weekend",
-    "email_domain_match", "card1_freq",
+    "tx_amt_log",
+    "tx_hour",
+    "tx_dayofweek",
+    "tx_is_weekend",
+    "email_domain_match",
+    "card1_freq",
     # Target
     "isFraud",
 ]
@@ -89,7 +131,9 @@ def _select_common_columns(
     selected = (priority + remaining)[:max_cols]
     logger.info(
         "Columns for drift analysis: %d selected from %d common (max_cols=%d)",
-        len(selected), len(common_all), max_cols,
+        len(selected),
+        len(common_all),
+        max_cols,
     )
     return ref[selected], cur[selected]
 
@@ -112,7 +156,9 @@ def _get_column_mapping(
 
     mapping = ColumnMapping(
         target=target_col if target_col in df.columns else None,
-        prediction=prediction_col if prediction_col and prediction_col in df.columns else None,
+        prediction=prediction_col
+        if prediction_col and prediction_col in df.columns
+        else None,
         numerical_features=num_cols,
         categorical_features=str_cols,
     )
@@ -159,7 +205,9 @@ def generate_target_drift_report(
 ) -> None:
     """Generate target drift report (if labels available in current)."""
     if target_col not in current.columns:
-        logger.warning("Target column '%s' not in current data — skipping target drift", target_col)
+        logger.warning(
+            "Target column '%s' not in current data — skipping target drift", target_col
+        )
         return
 
     reference, current = _select_common_columns(reference, current)
@@ -175,7 +223,9 @@ def generate_target_drift_report(
     logger.info("Target drift report saved to %s", output_path)
 
 
-def simulate_current_from_reference(reference: pd.DataFrame, n: int = 5000, seed: int = 42) -> pd.DataFrame:
+def simulate_current_from_reference(
+    reference: pd.DataFrame, n: int = 5000, seed: int = 42
+) -> pd.DataFrame:
     """
     If no real prediction log exists, create a synthetic current dataset
     by sampling + adding small noise — useful for testing the pipeline.
@@ -213,21 +263,29 @@ def run(
     if current_path and Path(current_path).exists():
         current = load_current(current_path)
     else:
-        logger.warning("No current data path provided or file not found — using synthetic sample")
+        logger.warning(
+            "No current data path provided or file not found — using synthetic sample"
+        )
         current = simulate_current_from_reference(reference)
 
     generate_drift_report(reference, current, target_col, prediction_col, output_path)
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     target_output = output_path.replace(".html", f"_target_{ts}.html")
-    generate_target_drift_report(reference, current, target_col, prediction_col, target_output)
+    generate_target_drift_report(
+        reference, current, target_col, prediction_col, target_output
+    )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate Evidently drift report")
     parser.add_argument("--params", default="params.yaml")
-    parser.add_argument("--reference", default=None, help="Override reference data path")
-    parser.add_argument("--current", default=None, help="Path to current/prediction-log data")
+    parser.add_argument(
+        "--reference", default=None, help="Override reference data path"
+    )
+    parser.add_argument(
+        "--current", default=None, help="Path to current/prediction-log data"
+    )
     parser.add_argument("--output", default="monitoring/reports/drift_report.html")
     parser.add_argument("--prediction-col", default="fraud_probability")
     args = parser.parse_args()

@@ -19,6 +19,7 @@ from src.data_preprocessing import (
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def sample_transaction_df() -> pd.DataFrame:
     return pd.DataFrame(
@@ -58,6 +59,7 @@ def clean_numeric_df() -> pd.DataFrame:
 
 # ── Test: load_raw_data ───────────────────────────────────────────────────────
 
+
 def test_load_raw_data_merges_on_transaction_id(
     tmp_path, sample_transaction_df, sample_identity_df
 ):
@@ -91,6 +93,7 @@ def test_load_raw_data_left_join_preserves_all_transactions(
 
 # ── Test: drop_columns ────────────────────────────────────────────────────────
 
+
 def test_drop_columns_removes_specified(sample_transaction_df):
     result = drop_columns(sample_transaction_df, ["TransactionID"])
     assert "TransactionID" not in result.columns
@@ -108,6 +111,7 @@ def test_drop_columns_multiple(sample_transaction_df):
 
 
 # ── Test: impute_missing ──────────────────────────────────────────────────────
+
 
 def test_impute_missing_numeric_median(sample_transaction_df):
     result = impute_missing(sample_transaction_df.copy(), numeric_strategy="median")
@@ -138,6 +142,7 @@ def test_impute_missing_no_nans_after_imputation(sample_transaction_df):
 
 # ── Test: encode_categoricals ─────────────────────────────────────────────────
 
+
 def test_encode_categoricals_converts_strings_to_int(sample_transaction_df):
     df = impute_missing(sample_transaction_df.copy())
     encoded, encoder_map = encode_categoricals(df)
@@ -164,6 +169,7 @@ def test_encode_categoricals_no_object_dtypes_remaining(sample_transaction_df):
 
 
 # ── Test: split_features_target ───────────────────────────────────────────────
+
 
 def test_split_features_target_separates_correctly(clean_numeric_df):
     X, y = split_features_target(clean_numeric_df, "isFraud")

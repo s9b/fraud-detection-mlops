@@ -78,14 +78,26 @@ def add_card_features(df: pd.DataFrame) -> pd.DataFrame:
 
     if "TransactionAmt" in df.columns:
         if "card1" in df.columns:
-            df["amt_card1_ratio"] = df["TransactionAmt"] / (df["card1"].replace(0, np.nan))
+            df["amt_card1_ratio"] = df["TransactionAmt"] / (
+                df["card1"].replace(0, np.nan)
+            )
         if "card5" in df.columns:
-            df["amt_card5_ratio"] = df["TransactionAmt"] / (df["card5"].replace(0, np.nan))
+            df["amt_card5_ratio"] = df["TransactionAmt"] / (
+                df["card5"].replace(0, np.nan)
+            )
 
     # Fill NaNs introduced by division
-    new_cols = [c for c in df.columns if c in [
-        "card1_card2_ratio", "card1_card2_sum", "amt_card1_ratio", "amt_card5_ratio"
-    ]]
+    new_cols = [
+        c
+        for c in df.columns
+        if c
+        in [
+            "card1_card2_ratio",
+            "card1_card2_sum",
+            "amt_card1_ratio",
+            "amt_card5_ratio",
+        ]
+    ]
     df[new_cols] = df[new_cols].fillna(0)
     return df
 

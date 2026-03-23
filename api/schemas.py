@@ -6,15 +6,19 @@ All prediction-time features are Optional[float] to handle missing data graceful
 
 from typing import Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 
 class TransactionFeatures(BaseModel):
     """Core transaction features from train_transaction.csv."""
 
     # --- Time & amount -------------------------------------------------------
-    TransactionDT: Optional[float] = Field(None, description="Timedelta (seconds) from a reference datetime")
-    TransactionAmt: Optional[float] = Field(None, ge=0, description="Transaction payment amount in USD")
+    TransactionDT: Optional[float] = Field(
+        None, description="Timedelta (seconds) from a reference datetime"
+    )
+    TransactionAmt: Optional[float] = Field(
+        None, ge=0, description="Transaction payment amount in USD"
+    )
 
     # --- Product -------------------------------------------------------------
     ProductCD: Optional[str] = Field(None, description="Product code (W, H, C, S, R)")
@@ -23,9 +27,13 @@ class TransactionFeatures(BaseModel):
     card1: Optional[float] = Field(None, description="Payment card information 1")
     card2: Optional[float] = Field(None, description="Payment card information 2")
     card3: Optional[float] = Field(None, description="Payment card information 3")
-    card4: Optional[str] = Field(None, description="Payment card information 4 (e.g. visa, mastercard)")
+    card4: Optional[str] = Field(
+        None, description="Payment card information 4 (e.g. visa, mastercard)"
+    )
     card5: Optional[float] = Field(None, description="Payment card information 5")
-    card6: Optional[str] = Field(None, description="Payment card information 6 (e.g. debit, credit)")
+    card6: Optional[str] = Field(
+        None, description="Payment card information 6 (e.g. debit, credit)"
+    )
 
     # --- Address & distance --------------------------------------------------
     addr1: Optional[float] = Field(None, description="Billing zip code")
@@ -486,8 +494,12 @@ class PredictResponse(BaseModel):
 
     model_config = {"protected_namespaces": ()}
 
-    fraud_probability: float = Field(..., ge=0.0, le=1.0, description="Probability of fraud [0,1]")
-    is_fraud: bool = Field(..., description="Binary fraud decision at configured threshold")
+    fraud_probability: float = Field(
+        ..., ge=0.0, le=1.0, description="Probability of fraud [0,1]"
+    )
+    is_fraud: bool = Field(
+        ..., description="Binary fraud decision at configured threshold"
+    )
     threshold: float = Field(..., description="Decision threshold used")
     model_version: str = Field(..., description="Model version used for prediction")
 

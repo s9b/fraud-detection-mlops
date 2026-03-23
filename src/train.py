@@ -209,7 +209,10 @@ def train(params_path: str = "params.yaml") -> None:
         mlflow.log_artifact(str(meta_path))
         logger.info("Run metadata saved to %s", meta_path)
 
-    logger.info("Training complete. Best model registered as '%s'.", mlflow_cfg["model_registry_name"])
+    logger.info(
+        "Training complete. Best model registered as '%s'.",
+        mlflow_cfg["model_registry_name"],
+    )
 
 
 if __name__ == "__main__":

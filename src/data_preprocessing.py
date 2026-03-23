@@ -13,7 +13,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import numpy as np
 import pandas as pd
 import yaml
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -59,7 +58,9 @@ def impute_missing(
     categorical_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
 
     logger.info(
-        "Imputing %d numeric cols with '%s' strategy", len(numeric_cols), numeric_strategy
+        "Imputing %d numeric cols with '%s' strategy",
+        len(numeric_cols),
+        numeric_strategy,
     )
     if numeric_strategy == "median":
         for col in numeric_cols:
@@ -81,7 +82,11 @@ def impute_missing(
         df[categorical_cols] = df[categorical_cols].fillna(categorical_fill_value)
     elif categorical_strategy == "mode":
         for col in categorical_cols:
-            mode_val = df[col].mode()[0] if not df[col].mode().empty else categorical_fill_value
+            mode_val = (
+                df[col].mode()[0]
+                if not df[col].mode().empty
+                else categorical_fill_value
+            )
             df[col] = df[col].fillna(mode_val)
 
     return df
@@ -101,7 +106,9 @@ def encode_categoricals(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     return df, encoder_map
 
 
-def split_features_target(df: pd.DataFrame, target_col: str) -> tuple[pd.DataFrame, pd.Series]:
+def split_features_target(
+    df: pd.DataFrame, target_col: str
+) -> tuple[pd.DataFrame, pd.Series]:
     if target_col not in df.columns:
         raise ValueError(f"Target column '{target_col}' not found in dataframe")
     X = df.drop(columns=[target_col])
@@ -132,7 +139,9 @@ def preprocess(params_path: str = "params.yaml") -> None:
 
     train_out = data_cfg["processed_train"]
     train_df.to_parquet(train_out, index=False)
-    logger.info("Saved processed training data to %s  shape=%s", train_out, train_df.shape)
+    logger.info(
+        "Saved processed training data to %s  shape=%s", train_out, train_df.shape
+    )
 
     # --- Test data (no isFraud column) ---
     test_df = load_raw_data(

@@ -14,7 +14,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import mlflow
 import mlflow.xgboost
-import numpy as np
 import pandas as pd
 import yaml
 from sklearn.metrics import (
@@ -42,7 +41,9 @@ def load_params(params_path: str = "params.yaml") -> dict:
 def load_latest_model(registry_name: str, mlflow_cfg: dict):
     """Load the latest version of the registered model."""
     client = mlflow.tracking.MlflowClient()
-    versions = client.get_latest_versions(registry_name, stages=["None", "Staging", "Production"])
+    versions = client.get_latest_versions(
+        registry_name, stages=["None", "Staging", "Production"]
+    )
     if not versions:
         raise RuntimeError(f"No versions found for model '{registry_name}'")
     latest = sorted(versions, key=lambda v: int(v.version), reverse=True)[0]
@@ -52,7 +53,9 @@ def load_latest_model(registry_name: str, mlflow_cfg: dict):
     return model, latest.version
 
 
-def evaluate(params_path: str = "params.yaml", output_json: str = "metrics.json") -> dict:
+def evaluate(
+    params_path: str = "params.yaml", output_json: str = "metrics.json"
+) -> dict:
     params = load_params(params_path)
     data_cfg = params["data"]
     eval_cfg = params["evaluation"]
@@ -83,7 +86,9 @@ def evaluate(params_path: str = "params.yaml", output_json: str = "metrics.json"
     )
 
     # Load model
-    model, model_version = load_latest_model(mlflow_cfg["model_registry_name"], mlflow_cfg)
+    model, model_version = load_latest_model(
+        mlflow_cfg["model_registry_name"], mlflow_cfg
+    )
 
     # Predict
     threshold = eval_cfg["threshold"]
@@ -108,7 +113,9 @@ def evaluate(params_path: str = "params.yaml", output_json: str = "metrics.json"
         logger.info("  %-25s %s", k, v)
 
     # Print classification report
-    logger.info("\n%s", classification_report(y_val, y_pred, target_names=["legit", "fraud"]))
+    logger.info(
+        "\n%s", classification_report(y_val, y_pred, target_names=["legit", "fraud"])
+    )
 
     # Confusion matrix
     cm = confusion_matrix(y_val, y_pred)
@@ -161,7 +168,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate fraud detection model")
     parser.add_argument("--params", default="params.yaml")
     parser.add_argument("--output", default="metrics.json")
-    parser.add_argument("--previous", default=None, help="Path to previous metrics.json for comparison")
+    parser.add_argument(
+        "--previous", default=None, help="Path to previous metrics.json for comparison"
+    )
     args = parser.parse_args()
 
     metrics = evaluate(params_path=args.params, output_json=args.output)

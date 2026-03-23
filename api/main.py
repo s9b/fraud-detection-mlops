@@ -8,15 +8,12 @@ Endpoints:
 import logging
 import time
 from contextlib import asynccontextmanager
-from pathlib import Path
-from typing import Optional
 
 import mlflow
 import mlflow.xgboost
-import numpy as np
 import pandas as pd
 import yaml
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.schemas import HealthResponse, PredictRequest, PredictResponse
@@ -52,7 +49,9 @@ def _load_model(params: dict) -> tuple:
             raise RuntimeError(f"No model versions found for '{registry_name}'")
         latest = sorted(versions, key=lambda v: int(v.version), reverse=True)[0]
         model_uri = f"models:/{registry_name}/{latest.version}"
-        logger.info("Loading model %s version %s from MLflow", registry_name, latest.version)
+        logger.info(
+            "Loading model %s version %s from MLflow", registry_name, latest.version
+        )
         model = mlflow.xgboost.load_model(model_uri)
         return model, str(latest.version)
     except Exception as exc:

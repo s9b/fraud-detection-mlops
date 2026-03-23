@@ -6,8 +6,6 @@ Uses small synthetic datasets — no real CSV loading needed.
 import numpy as np
 import pandas as pd
 import pytest
-import yaml
-from pathlib import Path
 from sklearn.metrics import average_precision_score
 from xgboost import XGBClassifier
 
@@ -24,6 +22,7 @@ from src.train import compute_metrics
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def _make_df(n: int = 200, seed: int = 0) -> pd.DataFrame:
     """
     Build a synthetic DataFrame that mimics post-preprocessing data.
@@ -36,12 +35,12 @@ def _make_df(n: int = 200, seed: int = 0) -> pd.DataFrame:
             "TransactionDT": rng.integers(86400, 86400 * 365, size=n).astype(float),
             "TransactionAmt": rng.uniform(1, 5000, size=n),
             # Categorical cols pre-encoded as integers (0-indexed label codes)
-            "ProductCD": rng.integers(0, 5, size=n).astype(float),   # W/H/C/S/R → 0-4
+            "ProductCD": rng.integers(0, 5, size=n).astype(float),  # W/H/C/S/R → 0-4
             "card1": rng.integers(1000, 20000, size=n).astype(float),
             "card2": rng.integers(100, 600, size=n).astype(float),
-            "card4": rng.integers(0, 3, size=n).astype(float),        # visa/mc/disc → 0-2
+            "card4": rng.integers(0, 3, size=n).astype(float),  # visa/mc/disc → 0-2
             "card5": rng.integers(100, 600, size=n).astype(float),
-            "card6": rng.integers(0, 2, size=n).astype(float),        # debit/credit → 0-1
+            "card6": rng.integers(0, 2, size=n).astype(float),  # debit/credit → 0-1
             "addr1": rng.integers(100, 600, size=n).astype(float),
             "addr2": rng.integers(1, 100, size=n).astype(float),
             "P_emaildomain": rng.integers(0, 3, size=n).astype(float),  # encoded domain
@@ -78,10 +77,18 @@ def _train_small_model(X: pd.DataFrame, y: pd.Series) -> XGBClassifier:
 
 # ── Feature engineering tests ─────────────────────────────────────────────────
 
+
 def test_add_time_features_creates_expected_columns():
     df = _make_df(50)
     result = add_time_features(df)
-    for col in ["tx_hour", "tx_dayofweek", "tx_day", "tx_month", "tx_is_weekend", "tx_is_night"]:
+    for col in [
+        "tx_hour",
+        "tx_dayofweek",
+        "tx_day",
+        "tx_month",
+        "tx_is_weekend",
+        "tx_is_night",
+    ]:
         assert col in result.columns, f"Missing column: {col}"
 
 
@@ -108,7 +115,9 @@ def test_add_email_domain_features_is_top_binary():
 def test_add_card_features_no_nan_after():
     df = _make_df(50)
     result = add_card_features(df)
-    card_feat_cols = [c for c in result.columns if "card1_card2" in c or "amt_card" in c]
+    card_feat_cols = [
+        c for c in result.columns if "card1_card2" in c or "amt_card" in c
+    ]
     assert len(card_feat_cols) > 0
     assert result[card_feat_cols].isna().sum().sum() == 0
 
@@ -145,6 +154,7 @@ def test_run_feature_engineering_no_nans():
 
 # ── compute_metrics tests ─────────────────────────────────────────────────────
 
+
 def test_compute_metrics_returns_all_keys():
     y_true = np.array([0, 0, 1, 1, 0, 1])
     y_proba = np.array([0.1, 0.2, 0.8, 0.9, 0.3, 0.7])
@@ -171,6 +181,7 @@ def test_compute_metrics_values_in_unit_interval():
 
 
 # ── Model fit / predict shape tests ──────────────────────────────────────────
+
 
 def test_model_predict_proba_shape():
     df = _make_df(200)
