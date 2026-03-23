@@ -1,0 +1,50 @@
+stages:
+  preprocess:
+    cmd: python src/data_preprocessing.py
+    deps:
+      - src/data_preprocessing.py
+      - src/feature_engineering.py
+      - data/raw/train_transaction.csv
+      - data/raw/train_identity.csv
+      - data/raw/test_transaction.csv
+      - data/raw/test_identity.csv
+      - params.yaml
+    params:
+      - params.yaml:
+          - data
+          - preprocessing
+    outs:
+      - data/processed/train.parquet
+      - data/processed/test.parquet
+
+  train:
+    cmd: python src/train.py
+    deps:
+      - src/train.py
+      - src/feature_engineering.py
+      - src/data_preprocessing.py
+      - data/processed/train.parquet
+      - params.yaml
+    params:
+      - params.yaml:
+          - model
+          - smote
+          - data
+          - feature_engineering
+    outs:
+      - data/processed/run_meta.yaml
+    metrics:
+      - data/processed/run_meta.yaml:
+          cache: false
+
+  evaluate:
+    cmd: python src/evaluate.py --params params.yaml --output metrics.json
+    deps:
+      - src/evaluate.py
+      - src/feature_engineering.py
+      - data/processed/train.parquet
+      - data/processed/run_meta.yaml
+      - params.yaml
+    metrics:
+      - metrics.json:
+          cache: false

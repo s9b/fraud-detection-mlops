@@ -1,25 +1,61 @@
-# Data files
-*.csv
-data/raw/
-data/processed/
-
-# ML artifacts
-mlruns/
-models/
-*.pkl
-*.joblib
-
-# DVC
-.dvc/cache
-
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
 *.egg-info/
 dist/
 build/
 .eggs/
-
-# System
-.DS_Store
+.venv/
+venv/
+env/
 .env
+
+# Data — tracked by DVC, not Git
+data/raw/
+data/processed/
+*.csv
+*.parquet
+
+# MLflow
+mlruns/
+mlflow.db
+metrics.json
+previous_metrics.json
+current_metrics.json
+
+# DVC
+.dvc/cache/
+.dvc/tmp/
+
+# Model artefacts
+*.pkl
+*.joblib
+*.model
+*.xgb
+
+# Monitoring reports
+monitoring/reports/
+
+# Pytest / coverage
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Ruff
+.ruff_cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb

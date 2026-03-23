@@ -1,0 +1,47 @@
+name: fraud-detection-mlops
+
+python_env: python_env.yaml
+
+entry_points:
+  preprocess:
+    parameters:
+      params_path: {type: str, default: "params.yaml"}
+    command: "python src/data_preprocessing.py"
+
+  train:
+    parameters:
+      params_path: {type: str, default: "params.yaml"}
+      n_estimators: {type: int, default: 300}
+      max_depth: {type: int, default: 6}
+      learning_rate: {type: float, default: 0.05}
+      subsample: {type: float, default: 0.8}
+      colsample_bytree: {type: float, default: 0.8}
+      scale_pos_weight: {type: float, default: 10}
+      smote_sampling_strategy: {type: float, default: 0.1}
+    command: >
+      python -c "
+      import yaml, sys
+      with open('{params_path}') as f:
+          params = yaml.safe_load(f)
+      params['model']['n_estimators'] = {n_estimators}
+      params['model']['max_depth'] = {max_depth}
+      params['model']['learning_rate'] = {learning_rate}
+      params['model']['subsample'] = {subsample}
+      params['model']['colsample_bytree'] = {colsample_bytree}
+      params['model']['scale_pos_weight'] = {scale_pos_weight}
+      params['smote']['sampling_strategy'] = {smote_sampling_strategy}
+      with open('{params_path}', 'w') as f:
+          yaml.dump(params, f)
+      " && python src/train.py
+
+  evaluate:
+    parameters:
+      params_path: {type: str, default: "params.yaml"}
+      output: {type: str, default: "metrics.json"}
+    command: "python src/evaluate.py --params {params_path} --output {output}"
+
+  serve:
+    parameters:
+      host: {type: str, default: "0.0.0.0"}
+      port: {type: int, default: 8000}
+    command: "uvicorn api.main:app --host {host} --port {port}"

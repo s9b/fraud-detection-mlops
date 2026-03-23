@@ -1,0 +1,86 @@
+version: "3.9"
+
+services:
+  # ── Fraud detection API ───────────────────────────────────────────────────
+  fraud-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: fraud-detection-api:latest
+    container_name: fraud-api
+    ports:
+      - "8000:8000"
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - PORT=8000
+    volumes:
+      - ./data/processed:/app/data/processed:ro
+      - mlruns_data:/app/mlruns
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import httpx; httpx.get('http://localhost:8000/health').raise_for_status()"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ── MLflow tracking server ────────────────────────────────────────────────
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.10.2
+    container_name: mlflow
+    ports:
+      - "5000:5000"
+    environment:
+      - MLFLOW_BACKEND_STORE_URI=sqlite:///mlruns/mlflow.db
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=/mlruns/artifacts
+    volumes:
+      - mlruns_data:/mlruns
+    command: >
+      mlflow server
+        --backend-store-uri sqlite:///mlruns/mlflow.db
+        --default-artifact-root /mlruns/artifacts
+        --host 0.0.0.0
+        --port 5000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ── Training job (one-shot) ───────────────────────────────────────────────
+  train:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    image: fraud-detection-trainer:latest
+    container_name: fraud-trainer
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+    volumes:
+      - ./data:/app/data
+      - ./src:/app/src
+      - ./params.yaml:/app/params.yaml
+      - mlruns_data:/app/mlruns
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    command: >
+      sh -c "
+        python src/data_preprocessing.py &&
+        python src/train.py &&
+        python src/evaluate.py
+      "
+    profiles:
+      - train  # only starts with: docker compose --profile train up train
+
+volumes:
+  mlruns_data:
+    driver: local

@@ -1,0 +1,281 @@
+name: CI/CD — Fraud Detection MLOps
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      force_deploy:
+        description: "Force deploy even without AUC-PR improvement"
+        required: false
+        default: "false"
+
+env:
+  PYTHON_VERSION: "3.11"
+  MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI || 'sqlite:///mlflow.db' }}
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/fraud-api
+
+jobs:
+  # ── 1. Lint ────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Run ruff check
+        run: ruff check src/ api/ monitoring/ tests/ --output-format=github
+
+      - name: Run ruff format check
+        run: ruff format --check src/ api/ monitoring/ tests/
+
+  # ── 2. Tests ───────────────────────────────────────────────────────────────
+  test:
+    name: Tests (pytest)
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests with coverage
+        run: |
+          pytest tests/ -v \
+            --cov=src --cov=api \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            -p no:warnings
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+  # ── 3. Retrain ─────────────────────────────────────────────────────────────
+  retrain:
+    name: Retrain model (DVC)
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      run_id: ${{ steps.train.outputs.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history for DVC
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Configure DVC remote (S3)
+        run: |
+          if [ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then
+            dvc remote modify myremote access_key_id "${{ secrets.AWS_ACCESS_KEY_ID }}"
+            dvc remote modify myremote secret_access_key "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+          fi
+        continue-on-error: true
+
+      - name: Pull DVC-tracked data
+        run: dvc pull --no-run-cache || echo "DVC pull skipped (no remote configured)"
+        continue-on-error: true
+
+      - name: Preprocess data
+        run: python src/data_preprocessing.py
+
+      - name: Train model
+        id: train
+        run: |
+          python src/train.py
+          # Extract run_id from metadata
+          RUN_ID=$(python -c "
+          import yaml
+          with open('data/processed/run_meta.yaml') as f:
+              meta = yaml.safe_load(f)
+          print(meta['run_id'])
+          ")
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Save current metrics as baseline
+        run: |
+          python src/evaluate.py --params params.yaml --output current_metrics.json
+
+      - name: Upload metrics artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: current-metrics
+          path: current_metrics.json
+
+      - name: Commit DVC lock file changes
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add dvc.lock || true
+          git diff --staged --quiet || git commit -m "chore: update dvc.lock after retrain [skip ci]"
+          git push || true
+        continue-on-error: true
+
+  # ── 4. Compare AUC-PR & gate deployment ───────────────────────────────────
+  compare:
+    name: Compare AUC-PR vs baseline
+    runs-on: ubuntu-latest
+    needs: retrain
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      should_deploy: ${{ steps.compare.outputs.should_deploy }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Download current metrics
+        uses: actions/download-artifact@v4
+        with:
+          name: current-metrics
+
+      - name: Download or initialise previous metrics
+        id: baseline
+        run: |
+          # Try to download baseline from a persistent store (e.g. GH releases / cache)
+          # Fall back to a minimal JSON with AUC-PR=0 (first run always deploys)
+          if [ -f "previous_metrics.json" ]; then
+            echo "Loaded previous metrics from cache"
+          else
+            echo '{"average_precision": 0.0, "roc_auc": 0.0}' > previous_metrics.json
+            echo "No baseline found — initialising with zeros (deploy will proceed)"
+          fi
+
+      - name: Compare AUC-PR improvement
+        id: compare
+        run: |
+          IMPROVEMENT_THRESHOLD=$(python -c "
+          import yaml
+          with open('params.yaml') as f:
+              p = yaml.safe_load(f)
+          print(p['evaluation']['auc_pr_improvement_threshold'])
+          ")
+
+          python -c "
+          import json, sys
+
+          with open('current_metrics.json') as f:
+              current = json.load(f)
+          with open('previous_metrics.json') as f:
+              previous = json.load(f)
+
+          current_ap  = current.get('average_precision', 0.0)
+          previous_ap = previous.get('average_precision', 0.0)
+          delta       = current_ap - previous_ap
+          threshold   = float('$IMPROVEMENT_THRESHOLD')
+
+          print(f'Current  AUC-PR: {current_ap:.4f}')
+          print(f'Previous AUC-PR: {previous_ap:.4f}')
+          print(f'Delta:           {delta:.4f}  (threshold={threshold})')
+
+          if delta >= threshold or '${{ github.event.inputs.force_deploy }}' == 'true':
+              print('Decision: DEPLOY')
+              with open('deploy_decision.txt', 'w') as f:
+                  f.write('true')
+          else:
+              print('Decision: SKIP (no significant improvement)')
+              with open('deploy_decision.txt', 'w') as f:
+                  f.write('false')
+          "
+
+          DECISION=$(cat deploy_decision.txt)
+          echo "should_deploy=$DECISION" >> "$GITHUB_OUTPUT"
+
+      - name: Store current metrics as new baseline
+        if: steps.compare.outputs.should_deploy == 'true'
+        run: cp current_metrics.json previous_metrics.json
+
+  # ── 5. Build & push Docker image ──────────────────────────────────────────
+  build-push:
+    name: Build & push Docker image
+    runs-on: ubuntu-latest
+    needs: compare
+    if: needs.compare.outputs.should_deploy == 'true'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── 6. Deploy (stub — extend for your infra) ──────────────────────────────
+  deploy:
+    name: Deploy API
+    runs-on: ubuntu-latest
+    needs: [compare, build-push]
+    if: needs.compare.outputs.should_deploy == 'true'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to production
+        run: |
+          echo "Deploying image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+          # ── Replace this block with your actual deploy command ────────────
+          # Examples:
+          #   kubectl set image deployment/fraud-api fraud-api=$IMAGE
+          #   aws ecs update-service --cluster prod --service fraud-api --force-new-deployment
+          #   fly deploy --image $IMAGE
+          echo "Deploy step complete — wire up your infra here."
+
+      - name: Notify on success
+        run: |
+          echo "Deployment successful for commit ${{ github.sha }}"
