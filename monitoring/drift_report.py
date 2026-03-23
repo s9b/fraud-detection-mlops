@@ -52,11 +52,46 @@ def load_current(current_path: str) -> pd.DataFrame:
     return df
 
 
-def _select_common_columns(ref: pd.DataFrame, cur: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Keep only columns present in both datasets."""
-    common = list(set(ref.columns) & set(cur.columns))
-    logger.info("Common columns for drift analysis: %d", len(common))
-    return ref[common], cur[common]
+_PRIORITY_COLS = [
+    # Key transaction features
+    "TransactionAmt", "TransactionDT", "ProductCD",
+    "card1", "card2", "card3", "card4", "card5", "card6",
+    "addr1", "addr2", "dist1", "dist2",
+    "P_emaildomain", "R_emaildomain",
+    # Count / timedelta features
+    "C1", "C2", "C3", "C4", "C5", "C6", "C13", "C14",
+    "D1", "D2", "D3", "D4", "D10", "D15",
+    # Top Vesta features by typical importance
+    "V258", "V257", "V201", "V169", "V87", "V82", "V83", "V53", "V54",
+    "V75", "V76", "V61", "V62",
+    # Engineered
+    "tx_amt_log", "tx_hour", "tx_dayofweek", "tx_is_weekend",
+    "email_domain_match", "card1_freq",
+    # Target
+    "isFraud",
+]
+
+
+def _select_common_columns(
+    ref: pd.DataFrame,
+    cur: pd.DataFrame,
+    max_cols: int = 50,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Keep only columns present in both datasets, limited to max_cols.
+    Priority columns are selected first so the report focuses on the most
+    informative features rather than timing out on 433 columns.
+    """
+    common_all = set(ref.columns) & set(cur.columns)
+    # Select priority cols first, then fill up to max_cols with remaining
+    priority = [c for c in _PRIORITY_COLS if c in common_all]
+    remaining = [c for c in sorted(common_all) if c not in priority]
+    selected = (priority + remaining)[:max_cols]
+    logger.info(
+        "Columns for drift analysis: %d selected from %d common (max_cols=%d)",
+        len(selected), len(common_all), max_cols,
+    )
+    return ref[selected], cur[selected]
 
 
 def _get_column_mapping(
@@ -169,6 +204,11 @@ def run(
     target_col = params["data"]["target_column"]
 
     reference = load_reference(params)
+
+    # Sample reference to 10k rows for Evidently performance (590k is very slow)
+    if len(reference) > 10_000:
+        reference = reference.sample(n=10_000, random_state=42)
+        logger.info("Sampled reference to 10k rows for report performance")
 
     if current_path and Path(current_path).exists():
         current = load_current(current_path)
