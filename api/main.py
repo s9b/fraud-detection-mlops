@@ -128,7 +128,7 @@ def _build_feature_row(request: PredictRequest, params: dict) -> pd.DataFrame:
 
 def _align_to_model(df: pd.DataFrame, model) -> pd.DataFrame:
     """Ensure the dataframe has exactly the features the model was trained on."""
-    if hasattr(model, "feature_names_in_"):
+    if hasattr(model, "feature_names_in_") and model.feature_names_in_ is not None:
         model_features = list(model.feature_names_in_)
         # Add missing columns as 0
         for col in model_features:

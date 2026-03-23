@@ -25,21 +25,27 @@ from src.train import compute_metrics
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _make_df(n: int = 200, seed: int = 0) -> pd.DataFrame:
+    """
+    Build a synthetic DataFrame that mimics post-preprocessing data.
+    Categorical columns are integer-encoded (matching what data_preprocessing.py
+    produces via LabelEncoder) so XGBoost accepts them without complaints.
+    """
     rng = np.random.default_rng(seed)
     df = pd.DataFrame(
         {
             "TransactionDT": rng.integers(86400, 86400 * 365, size=n).astype(float),
             "TransactionAmt": rng.uniform(1, 5000, size=n),
-            "ProductCD": rng.choice(["W", "H", "C", "S", "R"], size=n),
+            # Categorical cols pre-encoded as integers (0-indexed label codes)
+            "ProductCD": rng.integers(0, 5, size=n).astype(float),   # W/H/C/S/R → 0-4
             "card1": rng.integers(1000, 20000, size=n).astype(float),
             "card2": rng.integers(100, 600, size=n).astype(float),
-            "card4": rng.choice(["visa", "mastercard", "discover"], size=n),
+            "card4": rng.integers(0, 3, size=n).astype(float),        # visa/mc/disc → 0-2
             "card5": rng.integers(100, 600, size=n).astype(float),
-            "card6": rng.choice(["debit", "credit"], size=n),
+            "card6": rng.integers(0, 2, size=n).astype(float),        # debit/credit → 0-1
             "addr1": rng.integers(100, 600, size=n).astype(float),
             "addr2": rng.integers(1, 100, size=n).astype(float),
-            "P_emaildomain": rng.choice(["gmail.com", "yahoo.com", "anonymous.com"], size=n),
-            "R_emaildomain": rng.choice(["gmail.com", "hotmail.com", "comcast.net"], size=n),
+            "P_emaildomain": rng.integers(0, 3, size=n).astype(float),  # encoded domain
+            "R_emaildomain": rng.integers(0, 3, size=n).astype(float),  # encoded domain
             "C1": rng.uniform(0, 10, size=n),
             "D1": rng.uniform(0, 500, size=n),
             "isFraud": rng.choice([0, 1], size=n, p=[0.965, 0.035]),
