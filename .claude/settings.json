@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install *)",
+      "Bash(python *)",
+      "Bash(pytest *)",
+      "Bash(dvc *)",
+      "Bash(mlflow *)",
+      "Bash(uvicorn *)",
+      "Bash(docker *)"
+    ]
+  }
+}

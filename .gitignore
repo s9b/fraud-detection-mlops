@@ -1,0 +1,25 @@
+# Data files
+*.csv
+data/raw/
+data/processed/
+
+# ML artifacts
+mlruns/
+models/
+*.pkl
+*.joblib
+
+# DVC
+.dvc/cache
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# System
+.DS_Store
+.env
